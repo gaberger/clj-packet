@@ -1,6 +1,7 @@
 (ns clj-packet.core
   (:require [org.httpkit.client :as http]
             [cheshire.core :refer :all]
+            [environ.core :refer [env]]
             [taoensso.timbre :as timbre]
             [taoensso.timbre.appenders.core :as appenders]
             [clojure.pprint :refer [pprint]]
@@ -18,6 +19,7 @@
 (def base-url "https://api.packet.net")
 (def orgid "60bdbe9f-10c2-4ac9-bc75-6fd635f52daa")
 (def projectid "e40d191d-4394-477c-b47d-2f08cc26a98a")
+(def authToken  (env :authtoken))
 
 (def options {:headers {"Content-Type" "application/json"}})
 
@@ -72,10 +74,48 @@
             :apikey key})))
 
 
+(defn get-ssh-keys [k]
+  (get! (url-with-path "ssh-keys") k))
+
+
+;; Projects
+
+(defn get-projects
+  ([k]
+   (get! (url-with-path "projects") k))
+  ([id k]
+   (get! (url-with-path "projects" id) k))
+  ([id k & s]
+   (get! (url-with-path "projects" id s) k)))
+
+(defn create-device [project-id hostname plan operating_system quantity api-key]
+  (let [ssh-key (:name (get-ssh-keys api-key))]
+    (post! (url-with-path "projects" project-id "devices" "batch")
+           {:body {:batches
+                   [{:hostname hostname
+                     :plan plan
+                     :operating_system operating_system
+                     :quantity quantity
+                     :ssh_keys [ssh-key]}]}
+            :apikey key})))
+
 ;; Example Invitation
-(create-organizations-invitation orgid "foo@bar.com" "owner" projectid authToken)
+;;(create-organizations-invitation orgid "foo@bar.com" "owner" projectid authToken)
+
+(create-device projectid "test.dell.com" "baremetal_1e" "ubuntu_18_04" 1 authToken)
 
 ;; List invitations
-(pprint (get-organizations-invitations orgid authToken))
+;;(pprint (get-organizations-invitations orgid authToken))
 
 ;; Note authToken is private
+
+
+;; Device
+
+
+;;https://api.packet.net/projects/e40d191d-4394-477c-b47d-2f08cc26a98a/devices/batch?include=plan,ip_addresses,facility,ssh_keys,project,volumes,volumes.attachments,volumes.facility,volumes.snapshots,volumes.snapshot_policies,virtual_networks&exclude=project_lite&token=jD7qVsmzNyUefh7jXbapXR2PhRjLNKXt
+
+
+;;{"batches":[{"hostname":"test.delltest.com","plan":"baremetal_1e","operating_system":"ubuntu_18_04","facility":"ewr1","userdata":"","spot_instance":false,"spot_price_max":"","quantity":1,"public_ipv4_subnet_size":"28","private_ipv4_subnet_size":"28","user_ssh_keys":["a9375e9f-dea7-46d2-a80e-866c2c1ea336"]}]}
+
+
